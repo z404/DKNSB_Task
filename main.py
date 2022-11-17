@@ -4,12 +4,12 @@ import time
 import cv2
 import numpy as np
 import pytesseract
-from PIL import Image
+from fastapi.responses import FileResponse
+from pdf2image import convert_from_bytes, convert_from_path
 from skimage.color import rgb2gray
 from skimage.feature import match_template
 from skimage.io import imread
-from pdf2image import convert_from_path, convert_from_bytes
-from fastapi.responses import FileResponse
+
 
 class ImageProcessor:
     def read_image(self, filename: str) -> np.ndarray:
@@ -17,6 +17,8 @@ class ImageProcessor:
         return cv2.imread(filename)
 
     def perform_OCR_on_image(self, image: np.ndarray) -> str:
+        #TODO read country name from image
+        #TODO read multiline text for device name
         """Performs OCR on an image and returns the result as a string"""
         # convert to gray scale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -75,57 +77,43 @@ class ImageProcessor:
     def search_for_templates(self, image: np.ndarray, template_dir: str = "./symbols") -> str:
         """Searches for templates in an image and returns the result as a string"""
         list_of_images = []
-        image = cv2.resize(image, (image.shape[1], image.shape[1]))
-        image_gray = rgb2gray(image)
+        img1 = cv2.resize(image, (image.shape[1], image.shape[1]))
+        height, width = 175, 210
+        template_rows = [800, 800+height]
+        template_cols = [150, 150+width, 150+2*width, 150+3*width]
 
-        for template_n in os.listdir(template_dir):
-            if ".png" not in template_n:
-                continue
-            template = imread(f"{template_dir}/{template_n}")[:,:,:3]
-            
-            template_gray = rgb2gray(template)
+        template_string = ""
 
-            result = match_template(image_gray, template_gray)
+        # check for ce
+        if np.mean(img1[220:400, 1050:-125]) < 245:
+            template_string += "4"
 
-            # check if the template is found
-            if (np.max(result) > 0.48) or \
-            (np.max(result) > 0.35 and template_n == "9.png") or \
-            (np.max(result) > 0.38 and template_n == "7.png"):
-                ij = np.unravel_index(np.argmax(result), result.shape)
-                x, y = ij[::-1]
-                col = 0
-                if y < 700:
-                    col = 1
-                elif y < 900:
-                    col = 2
-                else:
-                    col = 3
+        # read symols directory
+        symbols = []
+        for i in range(1, 10):
+            symbols.append(cv2.imread('./symbols/{}.png'.format(i))[:,:,:3])
 
-                list_of_images.append((x, col, template.shape[1], template.shape[0], template_n[0]))
+        # fix 1st template
+        symbols[0] = cv2.resize(symbols[0], (width - 30, height - 30))
+
+        for row_num, row_val in enumerate(template_rows):
+            for col_num, col_val in enumerate(template_cols):
+                template = img1[row_val - 75:row_val+height + 75, col_val - 75:col_val+width + 75]
+                template_crop = template[75:-75, 75:-75]
+                if np.mean(template_crop) > 245:
+                    continue
+                
+                max_temp_score, max_temp = 0, 0
+                for symbol_num, symbol in enumerate(symbols):
+                    result = cv2.matchTemplate(template, symbol, cv2.TM_CCOEFF_NORMED)
+                    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+                    if max_val > max_temp_score:
+                        max_temp_score = max_val
+                        max_temp = symbol_num
+                template_string += str(max_temp + 1)
         
-        # plot the image
-        for i in list_of_images:
-            cv2.rectangle(image, (i[0], i[1]), (i[0] + i[2], i[1] + i[3]), (0, 255, 0), 2)
-
-
-        return list_of_images
-
-    def arrange_number(self, list_of_images: list) -> str:
-        """Arranges the number and returns the result as a string"""
-        arr = [[], [], [], []]
-        for i in list_of_images:
-            arr[i[1]].append(i)
-        # sort each column by x
-        for i in arr:
-            i.sort(key=lambda x: x[0])
+        return template_string
         
-        # get the number
-        number = ""
-        for i in arr:
-            for j in i:
-                number += j[4]
-        
-        return number
 
     def write_to_file(self, information: dict, number: str) -> None:
         """Writes the result to a file"""
@@ -157,6 +145,9 @@ class ImageProcessor:
         pages = convert_from_path(filename, 500)
         for page in pages:
             images.append(np.array(page))
+        
+        for i in range(len(images)):
+            images[i] = cv2.resize(images[i], (1436, 761))
         return images
 
     def process_image(self, image: np.ndarray) -> dict:
@@ -166,9 +157,7 @@ class ImageProcessor:
         # process OCR text
         information = self.process_OCR_text(text)
         # search for templates
-        list_of_images = self.search_for_templates(image)
-        # arrange number
-        number = self.arrange_number(list_of_images)
+        number = self.search_for_templates(image)
         # add number to information
         information["Symbols"] = number
 
@@ -207,8 +196,7 @@ class ImageProcessor:
         image = self.read_image(filename)
         text = self.perform_OCR_on_image(image)
         information = self.process_OCR_text(text)
-        list_of_images = self.search_for_templates(image)
-        number = self.arrange_number(list_of_images)
+        number = self.search_for_templates(image)
         self.write_to_file(information, number)
         timeend = time.time()
         print(f"Time taken: {timeend - timestart}")
@@ -226,8 +214,7 @@ class ImageProcessor:
         for image in images:
             text = self.perform_OCR_on_image(image)
             information = self.process_OCR_text(text)
-            list_of_images = self.search_for_templates(image)
-            number = self.arrange_number(list_of_images)
+            number = self.search_for_templates(image)
             self.write_to_file(information, number)
 
 if __name__ == "__main__":
