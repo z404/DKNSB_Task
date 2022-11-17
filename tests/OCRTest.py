@@ -7,6 +7,7 @@ from PIL import Image
 
 # read the image
 img = cv2.imread('./images/result_Page_1.jpg')
+img = cv2.resize(img, (img.shape[1], img.shape[1]))
 
 # convert to gray scale
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

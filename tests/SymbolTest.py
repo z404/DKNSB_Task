@@ -1,30 +1,26 @@
-from skimage.io import imread
-from skimage.feature import match_template
-from skimage.color import rgb2gray
-import numpy as np
-
-image = imread('./images/result_Page_2.jpg')
-template = imread('./symbols/4.png')[:,:,:3]
-
-image_gray = rgb2gray(image)
-template_gray = rgb2gray(template)
-
-result = match_template(image_gray, template_gray)
-
-# check if the template is found
-if np.max(result) > 0.8:
-    print('Found')
-else:
-    print('Not found')
-
-ij = np.unravel_index(np.argmax(result), result.shape)
-x, y = ij[::-1]
-
-print(x, y)
-
 import cv2
 
-img = cv2.imread('./images/result_Page_2.jpg')
+from skimage.feature import match_template
+from skimage.color import rgb2gray
+
+img1 = cv2.imread('./images/result_Page_1.jpg')
+img2 = cv2.imread('./symbols/9.png')[:,:,:3]
+
+# make img 1 a square by increasing the height
+img1 = cv2.resize(img1, (img1.shape[1], img1.shape[1]))
+
+# save the image
+cv2.imwrite('./res/resize.jpg', img1)
+
+# match the images
+result = match_template(rgb2gray(img1), rgb2gray(img2))
+
+# get the best match
+min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+print(max_val)
+
 # draw a rectangle around the matched region
-cv2.rectangle(img, (x, y), (x + template.shape[1], y + template.shape[0]), (0, 255, 0), 2)
-cv2.imwrite('./images/result_Page_x2.jpg', img)
+cv2.rectangle(img1, max_loc, (max_loc[0] + img2.shape[1], max_loc[1] + img2.shape[0]), (0, 255, 0), 2)
+
+# show the result
+cv2.imwrite('./res/result_Page_x2.jpg', img1)
