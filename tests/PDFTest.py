@@ -1,14 +1,6 @@
-import os
-import time
-
 import cv2
 import numpy as np
-import pytesseract
-from fastapi.responses import FileResponse
-from pdf2image import convert_from_bytes, convert_from_path
-from skimage.color import rgb2gray
-from skimage.feature import match_template
-from skimage.io import imread
+from pdf2image import convert_from_path
 
 images = []
 pages = convert_from_path("Label.pdf", 500)

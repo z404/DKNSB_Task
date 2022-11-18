@@ -1,7 +1,5 @@
 import cv2
 import numpy as np
-from skimage.feature import match_template
-from skimage.color import rgb2gray
 
 img1 = cv2.imread('./images/result_Page_2.jpg')
 

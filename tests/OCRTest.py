@@ -1,9 +1,7 @@
 # perform ocr on the image
 
 import cv2
-import numpy as np
 import pytesseract
-from PIL import Image
 
 # read the image
 img = cv2.imread('./images/result_Page_1.jpg')
