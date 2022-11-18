@@ -14,8 +14,6 @@ class ImageProcessor:
         return cv2.imread(filename)
 
     def perform_OCR_on_image(self, image: np.ndarray) -> str:
-        #TODO read country name from image
-        #TODO read multiline text for device name
         """Performs OCR on an image and returns the result as a string"""
         # convert to gray scale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -61,14 +59,23 @@ class ImageProcessor:
         # split on newlines
         dict_val = {}
         lines = text.splitlines()
-        for i in lines:
-            if ":" in i:
+        dict_val["Country"] = lines[0]
+        device_mode = False
+        for i in lines[1:]:
+            if "REF" in i: device_mode = False
+            if len(i.rstrip()) == 0:
+                continue
+            elif ":" in i:
                 key, value = i.split(":")
                 dict_val[key] = value.strip()
             elif "REF" in i:
                 key, value = i.split(" ")
                 dict_val[key] = value.strip()
-        
+            else:
+                if device_mode and "REF" not in i and i.lower() != "ce":
+                    dict_val["Device Name"] += " "+i
+            if "Device Name" in i: device_mode = True
+
         return dict_val
 
     def search_for_templates(self, image: np.ndarray, template_dir: str = "./symbols") -> str:
@@ -114,7 +121,6 @@ class ImageProcessor:
 
     def write_to_file(self, information: dict, number: str) -> None:
         """Writes the result to a file"""
-        self.clear_files()
         # check if result.csv exists
         if not os.path.exists("./result.csv"):
             with open("./result.csv", "w") as f:
@@ -199,14 +205,12 @@ class ImageProcessor:
         print(f"Time taken: {timeend - timestart}")
 
     def all_images_test(self):
-        self.clear_file()
         for i in os.listdir("./images"):
             if ".jpg" not in i:
                 continue
             self.single_img_test(f"./images/{i}")
 
     def pdf_test(self):
-        self.clear_file()
         images = self.read_pdf(f"./Label.pdf")
         for image in images:
             text = self.perform_OCR_on_image(image)
