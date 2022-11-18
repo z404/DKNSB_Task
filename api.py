@@ -7,7 +7,7 @@ import random
 
 # cors
 origins = ["*"]
-app = FastAPI()
+app = FastAPI(title="DKNSB Image Processing Task", description="This FastAPI backend is built to process the Images provided by DKNSB Medical Device Consultants")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
